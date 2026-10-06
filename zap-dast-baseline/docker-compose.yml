@@ -1,0 +1,30 @@
+services:
+  app:
+    image: maven:3.9.9-eclipse-temurin-21
+    working_dir: /src
+    volumes:
+      - .:/src
+      - m2:/root/.m2
+    command: mvn -q -B spring-boot:run
+    environment:
+      HARDENED: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/orders || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 40
+
+  zap:
+    image: ghcr.io/zaproxy/zaproxy:2.15.0
+    depends_on:
+      app:
+        condition: service_healthy
+    user: root
+    working_dir: /zap/wrk
+    volumes:
+      - ./zap-report:/zap/wrk
+    # -I: do not fail on warnings; drop it (or use -c rules.conf) to make the scan a gate.
+    command: zap-baseline.py -t http://app:8080/orders -r report.html -I
+
+volumes:
+  m2:
